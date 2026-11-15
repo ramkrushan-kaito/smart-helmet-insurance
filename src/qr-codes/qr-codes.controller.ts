@@ -6,7 +6,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { AuthUser } from '../common/types';
-import { GenerateQrDto, ScanQrDto, UpdateQrStatusDto } from './dto';
+import { GenerateQrDto, ScanBuyDto, ScanClaimDto, ScanQrDto, UpdateQrStatusDto } from './dto';
 import { QrCodesService, QrQueryDto } from './qr-codes.service';
 
 @ApiTags('qr-codes')
@@ -26,6 +26,20 @@ export class QrCodesController {
   @HttpCode(200)
   scan(@Body() dto: ScanQrDto, @Ip() ip: string) {
     return this.qr.scan(dto.token, ip);
+  }
+
+  @Public()
+  @Post('scan/claim')
+  @HttpCode(201)
+  scanClaim(@Body() dto: ScanClaimDto, @Ip() ip: string) {
+    return this.qr.claimFromScan(dto, ip);
+  }
+
+  @Public()
+  @Post('scan/buy')
+  @HttpCode(201)
+  scanBuy(@Body() dto: ScanBuyDto, @Ip() ip: string) {
+    return this.qr.buyFromScan(dto, ip);
   }
 
   @ApiBearerAuth()

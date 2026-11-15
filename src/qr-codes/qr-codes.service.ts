@@ -1,6 +1,6 @@
-import { HttpException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, QrStatus, RoleName } from '@prisma/client';
+import { PolicyStatus, Prisma, QrStatus, RoleName } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { mkdir, writeFile, rm } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -11,8 +11,9 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { qrAbsolute, qrDir } from '../common/files';
 import { pageArgs, pageResult, sortField } from '../common/pagination';
 import { PrismaService } from '../common/prisma.service';
+import { SequenceService } from '../common/sequence.service';
 import { AuthUser } from '../common/types';
-import { GenerateQrDto, UpdateQrStatusDto } from './dto';
+import { GenerateQrDto, ScanBuyDto, ScanClaimDto, UpdateQrStatusDto } from './dto';
 import { extractQrToken, isWellFormedToken, maskMobile, resolveQrLookup } from './qr-token.util';
 import { IsEnum, IsOptional } from 'class-validator';
 
@@ -28,6 +29,7 @@ export class QrCodesService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly audit: AuditService,
+    private readonly sequences: SequenceService,
   ) {}
 
   async list(query: QrQueryDto) {
@@ -124,9 +126,15 @@ export class QrCodesService {
                 vehicleMapping: { include: { vehicle: true } },
                 policies: {
                   where: { deletedAt: null },
-                  include: { product: true },
+                  include: {
+                    product: true,
+                    claims: {
+                      orderBy: { createdAt: 'desc' },
+                      take: 5,
+                      select: { claimNumber: true, status: true, claimAmount: true, incidentDate: true },
+                    },
+                  },
                   orderBy: { createdAt: 'desc' },
-                  take: 1,
                 },
               },
             },
@@ -165,10 +173,34 @@ export class QrCodesService {
     if (!decision.valid || !record?.helmet) {
       throw new HttpException(decision.message, decision.httpStatus);
     }
-    const policy = record.helmet.policies[0];
+    const policies = record.helmet.policies.map((policy) => ({
+      policyNumber: policy.policyNumber,
+      status: policy.status,
+      productName: policy.product.name,
+      startDate: policy.startDate,
+      endDate: policy.endDate,
+      premiumAmount: policy.premiumAmount.toString(),
+      coverageAmount: policy.coverageAmount.toString(),
+      claims: policy.claims.map((claim) => ({
+        claimNumber: claim.claimNumber,
+        status: claim.status,
+        claimAmount: claim.claimAmount.toString(),
+        incidentDate: claim.incidentDate,
+      })),
+    }));
+    const assigned = !decision.unassigned;
+    const vehicle = record.helmet.vehicleMapping?.vehicle ?? null;
+    const offers =
+      assigned && vehicle
+        ? await this.prisma.insuranceProduct.findMany({
+            where: { isActive: true },
+            orderBy: { premiumAmount: 'asc' },
+            select: { id: true, name: true, premiumAmount: true, coverageAmount: true, durationMonths: true },
+          })
+        : [];
     return {
       valid: true,
-      assigned: !decision.unassigned,
+      assigned,
       message: decision.message,
       helmet: {
         id: record.helmet.id,
@@ -179,26 +211,177 @@ export class QrCodesService {
         size: record.helmet.size,
         status: record.helmet.status,
       },
-      customer: decision.unassigned
-        ? null
-        : { fullName: record.helmet.customer?.fullName ?? null, mobileMasked: maskMobile(record.helmet.customer?.mobile) },
-      vehicle: record.helmet.vehicleMapping?.vehicle
+      customer: assigned
+        ? { fullName: record.helmet.customer?.fullName ?? null, mobileMasked: maskMobile(record.helmet.customer?.mobile) }
+        : null,
+      vehicle: vehicle
         ? {
-            registrationNumber: record.helmet.vehicleMapping.vehicle.registrationNumber,
-            make: record.helmet.vehicleMapping.vehicle.make,
-            model: record.helmet.vehicleMapping.vehicle.model,
-            type: record.helmet.vehicleMapping.vehicle.type,
+            registrationNumber: vehicle.registrationNumber,
+            make: vehicle.make,
+            model: vehicle.model,
+            type: vehicle.type,
           }
         : null,
-      policy: policy
-        ? {
-            policyNumber: policy.policyNumber,
-            status: policy.status,
-            productName: policy.product.name,
-            endDate: policy.endDate,
-          }
-        : null,
+      policy: policies[0] ?? null,
+      policies,
+      offers: offers.map((product) => ({
+        id: product.id,
+        name: product.name,
+        premiumAmount: product.premiumAmount.toString(),
+        coverageAmount: product.coverageAmount.toString(),
+        durationMonths: product.durationMonths,
+      })),
     };
+  }
+
+  async claimFromScan(dto: ScanClaimDto, ip?: string) {
+    const helmet = await this.assignedHelmet(dto.token);
+    const policy = helmet.policies.find((item) => item.status === PolicyStatus.ACTIVE);
+    if (!policy) throw new BadRequestException('Claims can only be submitted on an active policy.');
+    const incident = new Date(dto.incidentDate);
+    if (incident.getTime() > Date.now()) throw new BadRequestException('Incident date cannot be in the future.');
+    if (dto.claimAmount > Number(policy.coverageAmount)) {
+      throw new BadRequestException('Claim amount exceeds policy coverage.');
+    }
+    const claim = await this.prisma.$transaction(async (tx) => {
+      const claimNumber = await this.sequences.next('claim', 'CLM', tx);
+      return tx.insuranceClaim.create({
+        data: {
+          claimNumber,
+          policyId: policy.id,
+          customerId: policy.customerId,
+          incidentDate: incident,
+          description: dto.description.trim(),
+          claimAmount: dto.claimAmount,
+          status: 'SUBMITTED',
+          isDemo: true,
+        },
+      });
+    });
+    if (helmet.customer?.userId) {
+      await this.prisma.notification.create({
+        data: {
+          userId: helmet.customer.userId,
+          title: 'Claim submitted',
+          message: `DEMO DATA: claim ${claim.claimNumber} was submitted from a QR scan. No payment has been made.`,
+          channel: 'IN_APP',
+        },
+      });
+    }
+    await this.audit.log({
+      action: 'CREATE',
+      entity: 'insurance_claims',
+      entityId: claim.id,
+      ipAddress: ip,
+      metadata: { claimNumber: claim.claimNumber, source: 'qr-scan' },
+    });
+    return {
+      claimNumber: claim.claimNumber,
+      status: claim.status,
+      message: `Claim ${claim.claimNumber} submitted on ${policy.policyNumber}. This is demo data. No payment was made.`,
+    };
+  }
+
+  async buyFromScan(dto: ScanBuyDto, ip?: string) {
+    const helmet = await this.assignedHelmet(dto.token);
+    const vehicle = helmet.vehicleMapping?.vehicle;
+    if (!helmet.customer || !vehicle) {
+      throw new BadRequestException('This helmet needs an assigned customer and vehicle before a policy can be bought.');
+    }
+    const product = await this.prisma.insuranceProduct.findFirst({ where: { id: dto.productId, isActive: true } });
+    if (!product) throw new NotFoundException('Insurance product not found.');
+    const start = new Date();
+    start.setUTCHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setUTCMonth(end.getUTCMonth() + product.durationMonths);
+    const policy = await this.prisma.$transaction(async (tx) => {
+      const policyNumber = await this.sequences.next('policy', 'POL', tx);
+      const created = await tx.insurancePolicy.create({
+        data: {
+          policyNumber,
+          customerId: helmet.customer!.id,
+          vehicleId: vehicle.id,
+          productId: product.id,
+          helmetId: helmet.id,
+          status: PolicyStatus.ACTIVE,
+          startDate: start,
+          endDate: end,
+          premiumAmount: product.premiumAmount,
+          coverageAmount: product.coverageAmount,
+          isDemo: true,
+        },
+      });
+      const paymentRef = await this.sequences.next('payment', 'PAY', tx);
+      await tx.payment.create({
+        data: {
+          paymentRef,
+          customerId: helmet.customer!.id,
+          policyId: created.id,
+          amount: product.premiumAmount,
+          purpose: 'PREMIUM',
+          status: 'SUCCESS',
+          method: 'DEMO_UPI',
+          isDemo: true,
+          paidAt: new Date(),
+        },
+      });
+      return created;
+    });
+    await this.prisma.notification.create({
+      data: {
+        userId: helmet.customer.userId,
+        title: 'Demo policy purchased',
+        message: `DEMO DATA: ${policy.policyNumber} was purchased from a QR scan. No money was collected.`,
+        channel: 'IN_APP',
+      },
+    });
+    await this.audit.log({
+      action: 'CREATE',
+      entity: 'insurance_policies',
+      entityId: policy.id,
+      ipAddress: ip,
+      metadata: { policyNumber: policy.policyNumber, source: 'qr-scan' },
+    });
+    return {
+      policyNumber: policy.policyNumber,
+      status: policy.status,
+      message: `Policy ${policy.policyNumber} is active. Demo purchase only. No money was collected.`,
+    };
+  }
+
+  private async assignedHelmet(rawToken: string) {
+    const token = extractQrToken(rawToken);
+    const record = isWellFormedToken(token)
+      ? await this.prisma.helmetQrCode.findUnique({
+          where: { token },
+          include: {
+            helmet: {
+              include: {
+                customer: true,
+                vehicleMapping: { include: { vehicle: true } },
+                policies: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
+              },
+            },
+          },
+        })
+      : null;
+    const decision = resolveQrLookup({
+      token: rawToken,
+      record: record
+        ? {
+            status: record.status,
+            expiresAt: record.expiresAt,
+            helmet: record.helmet
+              ? { deletedAt: record.helmet.deletedAt, status: record.helmet.status, customerId: record.helmet.customerId }
+              : null,
+          }
+        : null,
+    });
+    if (!decision.valid || !record?.helmet) throw new HttpException(decision.message, decision.httpStatus);
+    if (decision.unassigned || !record.helmet.customer) {
+      throw new BadRequestException('This helmet is not yet assigned to a customer.');
+    }
+    return record.helmet;
   }
 
   async updateStatus(id: string, dto: UpdateQrStatusDto, actor: AuthUser, ip?: string) {

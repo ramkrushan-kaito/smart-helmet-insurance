@@ -133,6 +133,32 @@ export type QrRow = {
   helmet: { id: string; helmetCode: string; brand: string; model: string; status: string };
 };
 
+export type ScanClaim = {
+  claimNumber: string;
+  status: string;
+  claimAmount: string;
+  incidentDate: string;
+};
+
+export type ScanPolicy = {
+  policyNumber: string;
+  status: string;
+  productName: string;
+  startDate: string;
+  endDate: string;
+  premiumAmount: string;
+  coverageAmount: string;
+  claims: ScanClaim[];
+};
+
+export type ScanOffer = {
+  id: string;
+  name: string;
+  premiumAmount: string;
+  coverageAmount: string;
+  durationMonths: number;
+};
+
 export type ScanResult = {
   valid: boolean;
   assigned: boolean;
@@ -140,5 +166,7 @@ export type ScanResult = {
   helmet: { helmetCode: string; brand: string; model: string; color: string; size: string; status: string };
   customer: { fullName: string | null; mobileMasked: string | null } | null;
   vehicle: { registrationNumber: string; make: string; model: string; type: string } | null;
-  policy: { policyNumber: string; status: string; productName: string; endDate: string } | null;
+  policy: ScanPolicy | null;
+  policies: ScanPolicy[];
+  offers: ScanOffer[];
 };
