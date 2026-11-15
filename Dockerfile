@@ -17,4 +17,5 @@ COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/public ./public
 EXPOSE 3000
 # Migrate only. Never seed production from this image.
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+# Retry because a sleeping free database can miss the first lock attempt.
+CMD ["sh", "-c", "ok=0; for i in 1 2 3 4 5; do npx prisma migrate deploy && ok=1 && break; echo migrate retry $i; sleep 8; done; test \"$ok\" = 1 && node dist/main.js"]
