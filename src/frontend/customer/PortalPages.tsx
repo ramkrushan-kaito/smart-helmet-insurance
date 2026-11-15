@@ -132,16 +132,22 @@ export function MyPoliciesPage() {
   if (error) return <Alert severity="error">{error}</Alert>;
   return (
     <>
-      <PageHeader title="My policies" action={<Button component={RouterLink} to="/app/renewal" variant="outlined">Renewal request</Button>} />
+      <PageHeader title="Policies" action={<Button component={RouterLink} to="/app/renewal" variant="outlined">Renewal</Button>} />
       {!data?.data.length ? <EmptyState text="No policies yet." /> : (
-        <TableWrap>
-          <TableHead><TableRow><TableCell>Number</TableCell><TableCell>Product</TableCell><TableCell>Status</TableCell><TableCell>Ends</TableCell><TableCell /></TableRow></TableHead>
-          <TableBody>
-            {data?.data.map((policy) => (
-              <TableRow key={policy.id}><TableCell>{policy.policyNumber}</TableCell><TableCell>{policy.product?.name}</TableCell><TableCell><StatusChip value={policy.status} /></TableCell><TableCell>{day(policy.endDate)}</TableCell><TableCell><Button component={RouterLink} to={`/app/policies/${policy.id}`} size="small">Details</Button></TableCell></TableRow>
-            ))}
-          </TableBody>
-        </TableWrap>
+        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
+          {data.data.map((policy) => (
+            <Paper key={policy.id} variant="outlined" sx={{ p: 2.5 }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Typography variant="h6">{policy.policyNumber}</Typography>
+                <StatusChip value={policy.status} />
+              </Stack>
+              <Typography sx={{ mt: 1 }}>{policy.product?.name}</Typography>
+              <Typography>Cover {money(policy.coverageAmount)} · Premium {money(policy.premiumAmount)}</Typography>
+              <Typography color="text.secondary">Until {day(policy.endDate)}</Typography>
+              <Button component={RouterLink} to={`/app/policies/${policy.id}`} sx={{ mt: 1 }} variant="contained">Open policy</Button>
+            </Paper>
+          ))}
+        </Box>
       )}
     </>
   );
@@ -211,8 +217,9 @@ export function SubmitClaimPage() {
   const [form, setForm] = useState({ policyId: params.get('policyId') ?? '', incidentDate: '2026-11-01', description: '', claimAmount: '5000' });
   return (
     <>
-      <PageHeader title="Submit claim" subtitle="Only active policies can accept a claim. This does not pay anyone." />
-      <Stack component="form" spacing={2} sx={{ maxWidth: 640 }} onSubmit={async (event: FormEvent) => {
+      <PageHeader title="Submit claim" subtitle="Active policies only." />
+      <Paper variant="outlined" sx={{ p: 3, maxWidth: 640 }}>
+      <Stack component="form" spacing={2} onSubmit={async (event: FormEvent) => {
         event.preventDefault();
         try {
           const response = await api.post<Claim>('/claims', { ...form, claimAmount: Number(form.claimAmount) });
@@ -228,8 +235,9 @@ export function SubmitClaimPage() {
         <TextField type="date" label="Incident date" InputLabelProps={{ shrink: true }} value={form.incidentDate} onChange={(event) => setForm({ ...form, incidentDate: event.target.value })} />
         <TextField label="What happened" multiline minRows={3} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} required />
         <TextField label="Claim amount" value={form.claimAmount} onChange={(event) => setForm({ ...form, claimAmount: event.target.value })} />
-        <Button type="submit" variant="contained">Submit</Button>
+        <Button type="submit" variant="contained">Submit claim</Button>
       </Stack>
+      </Paper>
     </>
   );
 }

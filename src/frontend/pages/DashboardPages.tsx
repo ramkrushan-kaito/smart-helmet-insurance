@@ -33,7 +33,7 @@ export function AdminDashboardPage() {
   ];
   return (
     <Box>
-      <PageHeader title="Dashboard" subtitle="Live counts from local PostgreSQL. All records are demo data." />
+      <PageHeader title="Dashboard" />
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
         {cards.map(([label, value, to]) => (
           <Paper key={String(label)} component={RouterLink} to={String(to)} sx={{ p: 2, textDecoration: 'none', color: 'inherit' }} variant="outlined">
@@ -77,7 +77,7 @@ export function CustomerDashboardPage() {
   ];
   return (
     <Box>
-      <PageHeader title="Your cover" subtitle="Only your own demo records are shown." />
+      <PageHeader title="Your cover" />
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(5, 1fr)' } }}>
         {cards.map(([label, value, to]) => (
           <Paper key={String(label)} component={RouterLink} to={String(to)} sx={{ p: 2, textDecoration: 'none', color: 'inherit' }} variant="outlined">

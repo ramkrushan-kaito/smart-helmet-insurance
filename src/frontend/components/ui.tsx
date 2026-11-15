@@ -1,11 +1,22 @@
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Table, TableContainer, Typography } from '@mui/material';
 import { ReactNode } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 
 export function DemoBanner() {
+  return null;
+}
+
+export function PublicBar() {
   return (
-    <Alert severity="warning" className="no-print" sx={{ borderRadius: 0 }}>
-      DEMO MODE — fictional data only. No SMS is sent. Customer OTP is 123456.
-    </Alert>
+    <Box sx={{ bgcolor: 'primary.main', color: 'common.white' }}>
+      <Stack direction="row" alignItems="center" sx={{ maxWidth: 1120, mx: 'auto', px: 2, height: 64, gap: 1 }}>
+        <Typography component={RouterLink} to="/" variant="h6" sx={{ color: 'inherit', textDecoration: 'none', fontWeight: 750, flexGrow: 1 }}>
+          Kaito Nexus
+        </Typography>
+        <Button component={RouterLink} to="/scan" sx={{ color: 'inherit' }}>Scan</Button>
+        <Button component={RouterLink} to="/login" sx={{ color: 'inherit' }}>Sign in</Button>
+      </Stack>
+    </Box>
   );
 }
 

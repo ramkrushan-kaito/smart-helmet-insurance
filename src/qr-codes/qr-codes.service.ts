@@ -17,6 +17,14 @@ import { GenerateQrDto, ScanBuyDto, ScanClaimDto, UpdateQrStatusDto } from './dt
 import { extractQrToken, isWellFormedToken, maskMobile, resolveQrLookup } from './qr-token.util';
 import { IsEnum, IsOptional } from 'class-validator';
 
+const INSURERS = [
+  { code: 'NEXUS', name: 'Nexus Shield', line: 'Full helmet damage cover', premium: 2499, coverage: 150000, months: 12 },
+  { code: 'KAITO', name: 'Kaito Protect', line: 'Rider accident cover', premium: 1499, coverage: 75000, months: 12 },
+  { code: 'APEX', name: 'Apex Ride', line: 'Third-party liability', premium: 999, coverage: 50000, months: 6 },
+  { code: 'METRO', name: 'Metro Cover', line: 'Daily city commute', premium: 1799, coverage: 100000, months: 12 },
+  { code: 'SENTINEL', name: 'Sentinel Assurance', line: 'Theft and total loss', premium: 3499, coverage: 250000, months: 12 },
+];
+
 export class QrQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(QrStatus)
@@ -231,6 +239,7 @@ export class QrCodesService {
         coverageAmount: product.coverageAmount.toString(),
         durationMonths: product.durationMonths,
       })),
+      companies: assigned && vehicle ? INSURERS : [],
     };
   }
 
@@ -278,7 +287,7 @@ export class QrCodesService {
     return {
       claimNumber: claim.claimNumber,
       status: claim.status,
-      message: `Claim ${claim.claimNumber} submitted on ${policy.policyNumber}. This is demo data. No payment was made.`,
+      message: `Claim ${claim.claimNumber} is submitted on ${policy.policyNumber}.`,
     };
   }
 
@@ -288,8 +297,12 @@ export class QrCodesService {
     if (!helmet.customer || !vehicle) {
       throw new BadRequestException('This helmet needs an assigned customer and vehicle before a policy can be bought.');
     }
-    const product = await this.prisma.insuranceProduct.findFirst({ where: { id: dto.productId, isActive: true } });
-    if (!product) throw new NotFoundException('Insurance product not found.');
+    const product = dto.companyCode
+      ? await this.ensureInsurer(dto.companyCode)
+      : dto.productId
+        ? await this.prisma.insuranceProduct.findFirst({ where: { id: dto.productId, isActive: true } })
+        : null;
+    if (!product) throw new NotFoundException('Choose an insurer.');
     const start = new Date();
     start.setUTCHours(0, 0, 0, 0);
     const end = new Date(start);
@@ -330,8 +343,8 @@ export class QrCodesService {
     await this.prisma.notification.create({
       data: {
         userId: helmet.customer.userId,
-        title: 'Demo policy purchased',
-        message: `DEMO DATA: ${policy.policyNumber} was purchased from a QR scan. No money was collected.`,
+        title: 'Policy purchased',
+        message: `${policy.policyNumber} is now active.`,
         channel: 'IN_APP',
       },
     });
@@ -345,8 +358,25 @@ export class QrCodesService {
     return {
       policyNumber: policy.policyNumber,
       status: policy.status,
-      message: `Policy ${policy.policyNumber} is active. Demo purchase only. No money was collected.`,
+      message: `${product.name} cover is active. Policy ${policy.policyNumber}.`,
     };
+  }
+
+  private async ensureInsurer(code: string) {
+    const spec = INSURERS.find((item) => item.code === code.trim().toUpperCase());
+    if (!spec) throw new NotFoundException('Choose an insurer.');
+    const data = {
+      name: spec.name,
+      description: spec.line,
+      premiumAmount: spec.premium,
+      coverageAmount: spec.coverage,
+      durationMonths: spec.months,
+      isActive: true,
+      isDemo: true,
+    };
+    const existing = await this.prisma.insuranceProduct.findUnique({ where: { code: spec.code } });
+    if (existing) return this.prisma.insuranceProduct.update({ where: { id: existing.id }, data });
+    return this.prisma.insuranceProduct.create({ data: { code: spec.code, ...data } });
   }
 
   private async assignedHelmet(rawToken: string) {

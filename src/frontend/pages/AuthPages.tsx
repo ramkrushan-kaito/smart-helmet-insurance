@@ -71,7 +71,7 @@ export function OtpLoginPage() {
       <Box sx={{ maxWidth: 480, mx: 'auto', mt: 6, px: 2 }}>
         <Typography variant="h4">Customer sign in</Typography>
         <Typography color="text.secondary" sx={{ mb: 2 }}>
-          DEMO MODE. Requesting an OTP does not send an SMS.
+          Enter the mobile number on the policy. OTP is 123456.
         </Typography>
         <Paper sx={{ p: 3 }} variant="outlined">
           <Stack component="form" spacing={2} onSubmit={mobileForm.handleSubmit(async (values) => {

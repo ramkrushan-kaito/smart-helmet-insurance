@@ -16,7 +16,7 @@ export function ShellLayout({ items, home }: { items: { to: string; label: strin
   const drawer = (
     <Box sx={{ width: drawerWidth }}>
       <Toolbar>
-        <Typography variant="h6">HelmQR</Typography>
+        <Typography variant="h6">Kaito Nexus</Typography>
       </Toolbar>
       <Divider />
       <List>
@@ -45,7 +45,7 @@ export function ShellLayout({ items, home }: { items: { to: string; label: strin
             </IconButton>
           )}
           <Typography sx={{ flexGrow: 1 }} variant="h6">
-            Smart Helmet Insurance
+            Kaito Nexus
           </Typography>
           <Typography sx={{ mr: 2, display: { xs: 'none', sm: 'block' } }}>{user?.fullName}</Typography>
           <Typography

@@ -159,6 +159,15 @@ export type ScanOffer = {
   durationMonths: number;
 };
 
+export type ScanCompany = {
+  code: string;
+  name: string;
+  line: string;
+  premium: number;
+  coverage: number;
+  months: number;
+};
+
 export type ScanResult = {
   valid: boolean;
   assigned: boolean;
@@ -169,4 +178,5 @@ export type ScanResult = {
   policy: ScanPolicy | null;
   policies: ScanPolicy[];
   offers: ScanOffer[];
+  companies: ScanCompany[];
 };

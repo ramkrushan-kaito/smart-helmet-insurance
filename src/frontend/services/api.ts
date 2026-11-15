@@ -33,6 +33,10 @@ export function errorMessage(error: unknown) {
   return 'Something went wrong. Please try again.';
 }
 
+export function cleanName(value?: string | null) {
+  return (value ?? '').replace(/^DEMO DATA\s+/i, '').trim();
+}
+
 export function money(value?: string | number | null) {
   if (value === null || value === undefined || value === '') return '—';
   const amount = Number(value);

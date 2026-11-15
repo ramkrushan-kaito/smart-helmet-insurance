@@ -9,7 +9,8 @@ import { ShellLayout } from '../layouts/ShellLayout';
 import { AdminLoginPage, OtpLoginPage } from '../pages/AuthPages';
 import { AdminDashboardPage, CustomerDashboardPage } from '../pages/DashboardPages';
 import { AccessDeniedPage, InvalidQrPage, LandingPage, NotFoundPage } from '../pages/PublicPages';
-import { ScanPage } from '../pages/ScanPage';
+import { CoverPage } from '../pages/CoverPage';
+import { ScanPage, ScanRedirect } from '../pages/ScanPage';
 import { ProtectedRoute } from './ProtectedRoute';
 import { useAuth } from '../hooks/useAuth';
 
@@ -52,7 +53,8 @@ export function AppRoutes() {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/scan" element={<ScanPage />} />
-      <Route path="/scan/:token" element={<ScanPage />} />
+      <Route path="/scan/:token" element={<ScanRedirect />} />
+      <Route path="/cover/:token" element={<CoverPage />} />
       <Route path="/invalid-qr" element={<InvalidQrPage />} />
       <Route path="/login" element={<OtpLoginPage />} />
       <Route path="/admin/login" element={<AdminLoginPage />} />

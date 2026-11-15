@@ -44,8 +44,15 @@ export class ScanBuyDto {
   @MaxLength(2000)
   token: string;
 
+  @IsOptional()
   @IsUUID()
-  productId: string;
+  productId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(20)
+  companyCode?: string;
 }
 
 export class UpdateQrStatusDto {
