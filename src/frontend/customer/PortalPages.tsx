@@ -1,4 +1,4 @@
-import { Alert, Button, MenuItem, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import { FormEvent, useEffect, useState } from 'react';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { EmptyState, LoadingBlock, PageHeader, StatusChip, TableWrap } from '../components/ui';
@@ -67,6 +67,25 @@ export function MyHelmetsPage() {
 export function HelmetDetailPage() {
   const { id } = useParams();
   const { data, loading, error } = useFetch<Helmet>(id ? `/helmets/${id}` : null);
+  const [qrSrc, setQrSrc] = useState<string | null>(null);
+  const [qrError, setQrError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!data?.qrCode) return;
+    let cancelled = false;
+    let objectUrl = '';
+    setQrSrc(null);
+    setQrError(null);
+    api.get(`/qr-codes/${data.qrCode.id}/download`, { responseType: 'blob' }).then((response) => {
+      objectUrl = URL.createObjectURL(response.data);
+      if (!cancelled) setQrSrc(objectUrl);
+    }).catch((reason) => {
+      if (!cancelled) setQrError(errorMessage(reason));
+    });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [data?.qrCode?.id]);
   if (loading) return <LoadingBlock />;
   if (error || !data) return <Alert severity="error">{error || 'Helmet not found.'}</Alert>;
   return (
@@ -76,10 +95,14 @@ export function HelmetDetailPage() {
       <Typography sx={{ mt: 2 }}>Serial {data.serialNumber}. Made in {data.manufactureYear}.</Typography>
       {data.vehicleMapping ? <Typography>Linked vehicle {data.vehicleMapping.vehicle.registrationNumber}</Typography> : <Typography>No vehicle is linked.</Typography>}
       {data.qrCode ? (
-        <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+        <Stack spacing={1} sx={{ mt: 2, alignItems: 'flex-start' }}>
           <StatusChip value={data.qrCode.status} />
-          <Button onClick={() => downloadAuthenticated(`/qr-codes/${data.qrCode!.id}/download`, `${data.helmetCode}.png`)}>Download QR</Button>
-          <Button onClick={() => printQrImage(data.qrCode!.id, data.helmetCode)}>Print</Button>
+          {qrSrc ? <Box component="img" alt={`QR code for ${data.helmetCode}`} src={qrSrc} sx={{ width: 240, height: 240, bgcolor: '#fff', p: 1 }} /> : null}
+          {qrError ? <Alert severity="error">{qrError}</Alert> : null}
+          <Stack direction="row" spacing={1}>
+            <Button onClick={() => downloadAuthenticated(`/qr-codes/${data.qrCode!.id}/download`, `${data.helmetCode}.png`)}>Download QR</Button>
+            <Button onClick={() => printQrImage(data.qrCode!.id, data.helmetCode)}>Print</Button>
+          </Stack>
         </Stack>
       ) : <Typography>No QR code yet.</Typography>}
     </>

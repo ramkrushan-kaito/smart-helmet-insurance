@@ -408,9 +408,13 @@ export class QrCodesService {
 
   async image(id: string, actor: AuthUser, ip?: string) {
     const qr = await this.findOne(id, actor);
-    if (!qr.imagePath) throw new NotFoundException('QR image not found. Generate it again.');
-    const full = qrAbsolute(qr.imagePath);
-    if (!existsSync(full)) throw new NotFoundException('QR image file is missing. Generate it again.');
+    const scanUrl = `${this.baseUrl()}/scan/${qr.token}`;
+    let full = qr.imagePath ? qrAbsolute(qr.imagePath) : '';
+    if (!qr.imagePath || !existsSync(full)) {
+      const imagePath = await this.writeImage(qr.token, scanUrl);
+      full = qrAbsolute(imagePath);
+      await this.prisma.helmetQrCode.update({ where: { id: qr.id }, data: { imagePath, scanUrl } });
+    }
     await this.audit.log({
       userId: actor.userId,
       action: 'DOWNLOAD',
