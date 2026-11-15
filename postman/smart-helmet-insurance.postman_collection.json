@@ -1,0 +1,128 @@
+{
+  "info": {
+    "name": "Smart Helmet QR Insurance",
+    "description": "Local demo collection. Import this file and the local environment. No SMS is sent.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "adminToken", "value": "" },
+    { "key": "customerToken", "value": "" },
+    { "key": "helmetId", "value": "" },
+    { "key": "qrId", "value": "" },
+    { "key": "qrToken", "value": "" },
+    { "key": "policyId", "value": "" },
+    { "key": "claimId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/health" }
+    },
+    {
+      "name": "Admin login",
+      "event": [{ "listen": "test", "script": { "exec": ["const body = pm.response.json();", "pm.test('admin login', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('adminToken', body.accessToken);"] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"superadmin@demo.helmet.test\",\n  \"password\": \"Admin@12345\"\n}" },
+        "url": "{{baseUrl}}/api/auth/admin/login"
+      }
+    },
+    {
+      "name": "Request customer OTP",
+      "event": [{ "listen": "test", "script": { "exec": ["const body = pm.response.json();", "pm.test('no SMS', () => { pm.expect(body.smsSent).to.eql(false); pm.expect(body.message).to.include('No SMS'); });"] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"9000000001\"\n}" },
+        "url": "{{baseUrl}}/api/auth/request-otp"
+      }
+    },
+    {
+      "name": "Verify customer OTP",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('otp login', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('customerToken', pm.response.json().accessToken);"] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"9000000001\",\n  \"otp\": \"123456\"\n}" },
+        "url": "{{baseUrl}}/api/auth/verify-otp"
+      }
+    },
+    {
+      "name": "Customer policies",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('own policies', () => pm.response.to.have.status(200));", "const rows = pm.response.json().data;", "if (rows.length) pm.collectionVariables.set('policyId', rows[0].id);"] } }],
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }], "url": "{{baseUrl}}/api/policies" }
+    },
+    {
+      "name": "Create helmet",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('created', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('helmetId', pm.response.json().id);"] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"brand\": \"PostmanGuard\",\n  \"model\": \"Demo\",\n  \"color\": \"Blue\",\n  \"size\": \"L\",\n  \"serialNumber\": \"POSTMAN-SN-1\",\n  \"manufactureYear\": 2025\n}" },
+        "url": "{{baseUrl}}/api/helmets"
+      }
+    },
+    {
+      "name": "Generate QR",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('generated', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('qrId', pm.response.json().id);", "pm.collectionVariables.set('qrToken', pm.response.json().token);"] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"helmetId\": \"{{helmetId}}\"\n}" },
+        "url": "{{baseUrl}}/api/qr-codes/generate"
+      }
+    },
+    {
+      "name": "Download QR",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('png', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('image/png'));"] } }],
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/qr-codes/{{qrId}}/download" }
+    },
+    {
+      "name": "Scan valid seeded QR",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('valid', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().helmet.helmetCode).to.eql('HM10001'); });"] } }],
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"token\": \"active-demo-token-hm10001\"\n}" }, "url": "{{baseUrl}}/api/qr-codes/scan" }
+    },
+    {
+      "name": "Scan invalid QR",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('invalid', () => { pm.response.to.have.status(400); pm.expect(pm.response.json().message).to.include('not registered'); });"] } }],
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"token\": \"https://example.com/not-our-helmet\"\n}" }, "url": "{{baseUrl}}/api/qr-codes/scan" }
+    },
+    {
+      "name": "Scan unknown QR",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('unknown', () => pm.response.to.have.status(404));"] } }],
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"token\": \"unknown-but-well-formed-token-xyz\"\n}" }, "url": "{{baseUrl}}/api/qr-codes/scan" }
+    },
+    {
+      "name": "Scan inactive QR",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('inactive', () => pm.response.to.have.status(403));"] } }],
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"token\": \"inactive-demo-token-hm10008\"\n}" }, "url": "{{baseUrl}}/api/qr-codes/scan" }
+    },
+    {
+      "name": "Scan revoked QR",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('revoked', () => pm.response.to.have.status(410));"] } }],
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"token\": \"revoked-demo-token-hm10009\"\n}" }, "url": "{{baseUrl}}/api/qr-codes/scan" }
+    },
+    {
+      "name": "Submit claim",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('claim', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('claimId', pm.response.json().id);"] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"policyId\": \"{{policyId}}\",\n  \"incidentDate\": \"2026-10-02\",\n  \"description\": \"DEMO DATA postman claim. No real incident occurred.\",\n  \"claimAmount\": 900\n}" },
+        "url": "{{baseUrl}}/api/claims"
+      }
+    },
+    {
+      "name": "Update claim status",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('updated', () => pm.expect(pm.response.json().status).to.eql('UNDER_REVIEW'));"] } }],
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"status\": \"UNDER_REVIEW\"\n}" },
+        "url": "{{baseUrl}}/api/claims/{{claimId}}/status"
+      }
+    }
+  ]
+}

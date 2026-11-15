@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+coverage
+public/qr-codes/*.png
+public/documents/*
+!public/documents/.gitkeep
+!public/qr-codes/.gitkeep
+*.log
+.DS_Store
+.prisma

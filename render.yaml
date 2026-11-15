@@ -1,0 +1,29 @@
+# Free Render web service. Database is external (Neon free).
+# Do not add a Render Postgres instance here: the free database expires.
+services:
+  - type: web
+    name: smart-helmet-insurance
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DEMO_OTP_ENABLED
+        value: "true"
+      - key: DEMO_OTP_CODE
+        value: "123456"
+      - key: SMS_PROVIDER
+        value: none
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      - key: SWAGGER_ENABLED
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: QR_PUBLIC_BASE_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false

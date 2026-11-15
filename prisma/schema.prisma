@@ -1,0 +1,460 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum RoleName {
+  SUPER_ADMIN
+  ADMIN
+  CUSTOMER
+}
+
+enum HelmetStatus {
+  UNASSIGNED
+  ASSIGNED
+  RETIRED
+  LOST
+}
+
+enum QrStatus {
+  ACTIVE
+  INACTIVE
+  REVOKED
+}
+
+enum VehicleType {
+  MOTORCYCLE
+  SCOOTER
+  MOPED
+  OTHER
+}
+
+enum PolicyStatus {
+  ACTIVE
+  EXPIRED
+  PENDING
+  CANCELLED
+}
+
+enum ClaimStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  SETTLED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum PaymentPurpose {
+  PREMIUM
+  RENEWAL
+  CLAIM_SETTLEMENT
+}
+
+enum NotificationChannel {
+  IN_APP
+  SMS
+  EMAIL
+}
+
+enum OtpPurpose {
+  LOGIN
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  OTP_REQUEST
+  OTP_VERIFY
+  SCAN
+  STATUS_CHANGE
+  DOWNLOAD
+}
+
+enum RenewalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum KycStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        RoleName @unique
+  description String
+  permissions Json
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  users       User[]
+
+  @@map("roles")
+}
+
+model User {
+  id            String         @id @default(uuid()) @db.Uuid
+  email         String?        @unique
+  mobile        String?        @unique
+  passwordHash  String?        @map("password_hash")
+  fullName      String         @map("full_name")
+  status        UserStatus     @default(ACTIVE)
+  roleId        String         @map("role_id") @db.Uuid
+  role          Role           @relation(fields: [roleId], references: [id])
+  customer      Customer?
+  lastLoginAt   DateTime?      @map("last_login_at")
+  deletedAt     DateTime?      @map("deleted_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  notifications Notification[]
+  auditLogs     AuditLog[]
+
+  @@index([roleId])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Customer {
+  id           String            @id @default(uuid()) @db.Uuid
+  userId       String            @unique @map("user_id") @db.Uuid
+  user         User              @relation(fields: [userId], references: [id])
+  customerCode String            @unique @map("customer_code")
+  fullName     String            @map("full_name")
+  mobile       String            @unique
+  email        String?
+  address      String?
+  city         String?
+  state        String?
+  pincode      String?
+  dateOfBirth  DateTime?         @map("date_of_birth") @db.Date
+  kycStatus    KycStatus         @default(PENDING) @map("kyc_status")
+  isDemo       Boolean           @default(true) @map("is_demo")
+  deletedAt    DateTime?         @map("deleted_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  helmets      Helmet[]
+  vehicles     Vehicle[]
+  policies     InsurancePolicy[]
+  claims       InsuranceClaim[]
+  payments     Payment[]
+  renewals     RenewalRequest[]
+
+  @@index([city])
+  @@index([deletedAt])
+  @@map("customers")
+}
+
+model Helmet {
+  id              String                  @id @default(uuid()) @db.Uuid
+  helmetCode      String                  @unique @map("helmet_code")
+  customerId      String?                 @map("customer_id") @db.Uuid
+  customer        Customer?               @relation(fields: [customerId], references: [id])
+  brand           String
+  model           String
+  color           String
+  size            String
+  serialNumber    String                  @unique @map("serial_number")
+  manufactureYear Int                     @map("manufacture_year")
+  status          HelmetStatus            @default(UNASSIGNED)
+  isDemo          Boolean                 @default(true) @map("is_demo")
+  deletedAt       DateTime?               @map("deleted_at")
+  createdAt       DateTime                @default(now()) @map("created_at")
+  updatedAt       DateTime                @updatedAt @map("updated_at")
+  qrCode          HelmetQrCode?
+  vehicleMapping  HelmetVehicleMapping?
+  policies        InsurancePolicy[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("helmets")
+}
+
+model HelmetQrCode {
+  id            String    @id @default(uuid()) @db.Uuid
+  helmetId      String    @unique @map("helmet_id") @db.Uuid
+  helmet        Helmet    @relation(fields: [helmetId], references: [id])
+  token         String    @unique
+  status        QrStatus  @default(ACTIVE)
+  scanUrl       String    @map("scan_url")
+  imagePath     String?   @map("image_path")
+  expiresAt     DateTime? @map("expires_at")
+  generatedAt   DateTime  @default(now()) @map("generated_at")
+  revokedAt     DateTime? @map("revoked_at")
+  revokedReason String?   @map("revoked_reason")
+  lastScannedAt DateTime? @map("last_scanned_at")
+  scanCount     Int       @default(0) @map("scan_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("helmet_qr_codes")
+}
+
+model Vehicle {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  vehicleCode        String                 @unique @map("vehicle_code")
+  customerId         String                 @map("customer_id") @db.Uuid
+  customer           Customer               @relation(fields: [customerId], references: [id])
+  registrationNumber String                 @unique @map("registration_number")
+  type               VehicleType
+  make               String
+  model              String
+  year               Int
+  color              String
+  chassisNumber      String                 @unique @map("chassis_number")
+  engineNumber       String                 @map("engine_number")
+  isDemo             Boolean                @default(true) @map("is_demo")
+  deletedAt          DateTime?              @map("deleted_at")
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
+  helmetMappings     HelmetVehicleMapping[]
+  policies           InsurancePolicy[]
+
+  @@index([customerId])
+  @@index([deletedAt])
+  @@map("vehicles")
+}
+
+model HelmetVehicleMapping {
+  id        String   @id @default(uuid()) @db.Uuid
+  helmetId  String   @unique @map("helmet_id") @db.Uuid
+  vehicleId String   @map("vehicle_id") @db.Uuid
+  helmet    Helmet   @relation(fields: [helmetId], references: [id])
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
+  isActive  Boolean  @default(true) @map("is_active")
+  linkedAt  DateTime @default(now()) @map("linked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([vehicleId])
+  @@map("helmet_vehicle_mappings")
+}
+
+model InsuranceProduct {
+  id             String            @id @default(uuid()) @db.Uuid
+  code           String            @unique
+  name           String
+  description    String
+  coverageAmount Decimal           @map("coverage_amount") @db.Decimal(12, 2)
+  premiumAmount  Decimal           @map("premium_amount") @db.Decimal(12, 2)
+  durationMonths Int               @map("duration_months")
+  isActive       Boolean           @default(true) @map("is_active")
+  isDemo         Boolean           @default(true) @map("is_demo")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  policies       InsurancePolicy[]
+
+  @@map("insurance_products")
+}
+
+model InsurancePolicy {
+  id             String             @id @default(uuid()) @db.Uuid
+  policyNumber   String             @unique @map("policy_number")
+  customerId     String             @map("customer_id") @db.Uuid
+  vehicleId      String             @map("vehicle_id") @db.Uuid
+  productId      String             @map("product_id") @db.Uuid
+  helmetId       String?            @map("helmet_id") @db.Uuid
+  customer       Customer           @relation(fields: [customerId], references: [id])
+  vehicle        Vehicle            @relation(fields: [vehicleId], references: [id])
+  product        InsuranceProduct   @relation(fields: [productId], references: [id])
+  helmet         Helmet?            @relation(fields: [helmetId], references: [id])
+  status         PolicyStatus       @default(PENDING)
+  startDate      DateTime           @map("start_date") @db.Date
+  endDate        DateTime           @map("end_date") @db.Date
+  premiumAmount  Decimal            @map("premium_amount") @db.Decimal(12, 2)
+  coverageAmount Decimal            @map("coverage_amount") @db.Decimal(12, 2)
+  isDemo         Boolean            @default(true) @map("is_demo")
+  deletedAt      DateTime?          @map("deleted_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+  documents      PolicyDocument[]
+  claims         InsuranceClaim[]
+  payments       Payment[]
+  renewals       RenewalRequest[]
+
+  @@index([customerId])
+  @@index([vehicleId])
+  @@index([productId])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("insurance_policies")
+}
+
+model PolicyDocument {
+  id         String          @id @default(uuid()) @db.Uuid
+  policyId   String          @map("policy_id") @db.Uuid
+  policy     InsurancePolicy @relation(fields: [policyId], references: [id])
+  fileName   String          @map("file_name")
+  storedName String          @map("stored_name")
+  mimeType   String          @map("mime_type")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+
+  @@index([policyId])
+  @@map("policy_documents")
+}
+
+model InsuranceClaim {
+  id              String          @id @default(uuid()) @db.Uuid
+  claimNumber     String          @unique @map("claim_number")
+  policyId        String          @map("policy_id") @db.Uuid
+  customerId      String          @map("customer_id") @db.Uuid
+  policy          InsurancePolicy @relation(fields: [policyId], references: [id])
+  customer        Customer        @relation(fields: [customerId], references: [id])
+  status          ClaimStatus     @default(SUBMITTED)
+  incidentDate    DateTime        @map("incident_date") @db.Date
+  description     String
+  claimAmount     Decimal         @map("claim_amount") @db.Decimal(12, 2)
+  approvedAmount  Decimal?        @map("approved_amount") @db.Decimal(12, 2)
+  rejectionReason String?         @map("rejection_reason")
+  isDemo          Boolean         @default(true) @map("is_demo")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  documents       ClaimDocument[]
+  payments        Payment[]
+
+  @@index([policyId])
+  @@index([customerId])
+  @@index([status])
+  @@map("insurance_claims")
+}
+
+model ClaimDocument {
+  id         String         @id @default(uuid()) @db.Uuid
+  claimId    String         @map("claim_id") @db.Uuid
+  claim      InsuranceClaim @relation(fields: [claimId], references: [id])
+  fileName   String         @map("file_name")
+  storedName String         @map("stored_name")
+  mimeType   String         @map("mime_type")
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+
+  @@index([claimId])
+  @@map("claim_documents")
+}
+
+model Payment {
+  id         String           @id @default(uuid()) @db.Uuid
+  paymentRef String           @unique @map("payment_ref")
+  customerId String           @map("customer_id") @db.Uuid
+  policyId   String?          @map("policy_id") @db.Uuid
+  claimId    String?          @map("claim_id") @db.Uuid
+  customer   Customer         @relation(fields: [customerId], references: [id])
+  policy     InsurancePolicy? @relation(fields: [policyId], references: [id])
+  claim      InsuranceClaim?  @relation(fields: [claimId], references: [id])
+  amount     Decimal          @db.Decimal(12, 2)
+  purpose    PaymentPurpose
+  status     PaymentStatus    @default(PENDING)
+  method     String
+  isDemo     Boolean          @default(true) @map("is_demo")
+  paidAt     DateTime?        @map("paid_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  @@index([customerId])
+  @@index([policyId])
+  @@index([status])
+  @@map("payments")
+}
+
+model OtpVerification {
+  id         String     @id @default(uuid()) @db.Uuid
+  mobile     String
+  codeHash   String     @map("code_hash")
+  purpose    OtpPurpose @default(LOGIN)
+  expiresAt  DateTime   @map("expires_at")
+  attempts   Int        @default(0)
+  consumedAt DateTime?  @map("consumed_at")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  @@index([mobile, createdAt])
+  @@map("otp_verifications")
+}
+
+model Notification {
+  id        String              @id @default(uuid()) @db.Uuid
+  userId    String              @map("user_id") @db.Uuid
+  user      User                @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  channel   NotificationChannel @default(IN_APP)
+  isRead    Boolean             @default(false) @map("is_read")
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String?     @map("user_id") @db.Uuid
+  user      User?       @relation(fields: [userId], references: [id])
+  action    AuditAction
+  entity    String
+  entityId  String?     @map("entity_id")
+  metadata  Json?
+  ipAddress String?     @map("ip_address")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+model RenewalRequest {
+  id         String          @id @default(uuid()) @db.Uuid
+  policyId   String          @map("policy_id") @db.Uuid
+  customerId String          @map("customer_id") @db.Uuid
+  policy     InsurancePolicy @relation(fields: [policyId], references: [id])
+  customer   Customer        @relation(fields: [customerId], references: [id])
+  status     RenewalStatus   @default(PENDING)
+  note       String
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+
+  @@index([customerId])
+  @@index([policyId])
+  @@index([status])
+  @@map("renewal_requests")
+}
+
+model Sequence {
+  name  String @id
+  value Int
+
+  @@map("sequences")
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}

@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+coverage
+.git
+*.log
+public/qr-codes/*.png
+public/documents/*
+!public/documents/.gitkeep
+!public/qr-codes/.gitkeep
