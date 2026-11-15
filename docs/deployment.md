@@ -53,7 +53,7 @@ SWAGGER_ENABLED=true
 
 This folder is the whole app. Create one empty GitHub repository and push this folder. Do not push `.env`. GitHub Actions in `.github/workflows/ci.yml` uses a throwaway Postgres service and does not touch Neon.
 
-I have not created the GitHub repository or the Render/Neon accounts. Say when you want to sign in and I will stop at each login screen.
+The application code is in the private repository https://github.com/ramkrushan-kaito/smart-helmet-insurance. `.env` was not pushed. Neon and Render still need a sign-in in the browser. Free Neon does not ask for a card. Do not add a card on Render.
 
 ## If free hosting will not hold the app
 
