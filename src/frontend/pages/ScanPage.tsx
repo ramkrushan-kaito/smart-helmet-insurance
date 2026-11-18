@@ -1,5 +1,5 @@
 import { Alert, Box, Button, Stack, TextField, Typography } from '@mui/material';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { PublicBar } from '../components/ui';
@@ -21,6 +21,25 @@ export function ScanPage() {
     started.current = true;
     const scanner = new Html5Qrcode('qr-reader');
     let stopped = false;
+    let stopping: Promise<void> | null = null;
+
+    // html5-qrcode's stop() throws synchronously when the scanner is not running,
+    // which crashed the page during unmount and blocked the redirect until a refresh.
+    const stopScanner = () => {
+      if (stopping) return stopping;
+      try {
+        const state = scanner.getState();
+        if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
+          stopping = scanner.stop().catch(() => undefined);
+          return stopping;
+        }
+      } catch {
+        /* scanner already stopped */
+      }
+      stopping = Promise.resolve();
+      return stopping;
+    };
+
     scanner
       .start(
         { facingMode: 'environment' },
@@ -28,17 +47,22 @@ export function ScanPage() {
         (text) => {
           if (stopped) return;
           stopped = true;
-          scanner.stop().catch(() => undefined);
-          navigate(`/cover/${encodeURIComponent(readToken(text))}`, { replace: true });
+          const token = readToken(text);
+          void stopScanner();
+          navigate(`/cover/${encodeURIComponent(token)}`, { replace: true });
         },
         () => undefined,
       )
+      .then(() => {
+        // Component unmounted while the camera was still starting.
+        if (stopped) void stopScanner();
+      })
       .catch(() => {
         if (!stopped) setCameraError('Camera is unavailable. Enter the code below.');
       });
     return () => {
       stopped = true;
-      scanner.stop().catch(() => undefined);
+      void stopScanner();
     };
   }, [navigate]);
 
