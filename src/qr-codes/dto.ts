@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsDateString, IsEnum, IsNumber, IsOptional, IsString, IsUUID, MaxLength, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsEnum, IsIn, IsNumber, IsOptional, IsString, IsUUID, MaxLength, Min, MinLength } from 'class-validator';
 import { QrStatus } from '@prisma/client';
 
 export class GenerateQrDto {
@@ -53,6 +53,10 @@ export class ScanBuyDto {
   @MinLength(2)
   @MaxLength(20)
   companyCode?: string;
+
+  @IsOptional()
+  @IsIn(['UPI', 'CARD', 'NETBANKING'])
+  paymentMethod?: 'UPI' | 'CARD' | 'NETBANKING';
 }
 
 export class UpdateQrStatusDto {

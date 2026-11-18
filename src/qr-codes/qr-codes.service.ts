@@ -18,11 +18,31 @@ import { extractQrToken, isWellFormedToken, maskMobile, resolveQrLookup } from '
 import { IsEnum, IsOptional } from 'class-validator';
 
 const INSURERS = [
-  { code: 'NEXUS', name: 'Nexus Shield', line: 'Full helmet damage cover', premium: 2499, coverage: 150000, months: 12 },
-  { code: 'KAITO', name: 'Kaito Protect', line: 'Rider accident cover', premium: 1499, coverage: 75000, months: 12 },
-  { code: 'APEX', name: 'Apex Ride', line: 'Third-party liability', premium: 999, coverage: 50000, months: 6 },
-  { code: 'METRO', name: 'Metro Cover', line: 'Daily city commute', premium: 1799, coverage: 100000, months: 12 },
-  { code: 'SENTINEL', name: 'Sentinel Assurance', line: 'Theft and total loss', premium: 3499, coverage: 250000, months: 12 },
+  {
+    code: 'NEXUS', name: 'Nexus Shield', line: 'Full helmet damage cover', premium: 2499, coverage: 150000, months: 12,
+    claimRatio: 98.2, tag: 'Best seller',
+    features: ['Helmet repair or replacement', 'Accidental damage, any cause', 'Cashless at 1,200+ partner stores', 'Claim settled in 7 days'],
+  },
+  {
+    code: 'KAITO', name: 'Kaito Protect', line: 'Rider accident cover', premium: 1499, coverage: 75000, months: 12,
+    claimRatio: 96.5, tag: 'Value pick',
+    features: ['Personal accident cover for rider', 'Hospital cash ₹1,000 a day', 'Helmet damage up to ₹10,000', '24x7 claim helpline'],
+  },
+  {
+    code: 'APEX', name: 'Apex Ride', line: 'Third-party liability', premium: 999, coverage: 50000, months: 6,
+    claimRatio: 94.1, tag: 'Lowest price',
+    features: ['Third-party injury and property cover', 'Legal expense support', 'Short 6-month term', 'Instant digital policy'],
+  },
+  {
+    code: 'METRO', name: 'Metro Cover', line: 'Daily city commute', premium: 1799, coverage: 100000, months: 12,
+    claimRatio: 97.0, tag: null,
+    features: ['Commute accident cover', 'Helmet theft from parking', 'Roadside assistance in 40 cities', 'Zero paperwork claims'],
+  },
+  {
+    code: 'SENTINEL', name: 'Sentinel Assurance', line: 'Theft and total loss', premium: 3499, coverage: 250000, months: 12,
+    claimRatio: 99.1, tag: 'Highest cover',
+    features: ['Theft and total loss of helmet', 'Rider accident cover up to ₹2.5 lakh', 'Smart-helmet electronics covered', 'Free replacement helmet'],
+  },
 ];
 
 export class QrQueryDto extends PaginationQueryDto {
@@ -307,6 +327,7 @@ export class QrCodesService {
     start.setUTCHours(0, 0, 0, 0);
     const end = new Date(start);
     end.setUTCMonth(end.getUTCMonth() + product.durationMonths);
+    let reference = '';
     const policy = await this.prisma.$transaction(async (tx) => {
       const policyNumber = await this.sequences.next('policy', 'POL', tx);
       const created = await tx.insurancePolicy.create({
@@ -325,6 +346,7 @@ export class QrCodesService {
         },
       });
       const paymentRef = await this.sequences.next('payment', 'PAY', tx);
+      reference = paymentRef;
       await tx.payment.create({
         data: {
           paymentRef,
@@ -333,7 +355,7 @@ export class QrCodesService {
           amount: product.premiumAmount,
           purpose: 'PREMIUM',
           status: 'SUCCESS',
-          method: 'DEMO_UPI',
+          method: `DEMO_${dto.paymentMethod ?? 'UPI'}`,
           isDemo: true,
           paidAt: new Date(),
         },
@@ -358,6 +380,12 @@ export class QrCodesService {
     return {
       policyNumber: policy.policyNumber,
       status: policy.status,
+      paymentRef: reference,
+      productName: product.name,
+      premiumAmount: product.premiumAmount.toString(),
+      coverageAmount: product.coverageAmount.toString(),
+      startDate: policy.startDate,
+      endDate: policy.endDate,
       message: `${product.name} cover is active. Policy ${policy.policyNumber}.`,
     };
   }

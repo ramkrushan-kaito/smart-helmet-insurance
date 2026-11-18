@@ -166,6 +166,21 @@ export type ScanCompany = {
   premium: number;
   coverage: number;
   months: number;
+  claimRatio: number;
+  tag: string | null;
+  features: string[];
+};
+
+export type ScanPurchase = {
+  policyNumber: string;
+  status: string;
+  paymentRef: string;
+  productName: string;
+  premiumAmount: string;
+  coverageAmount: string;
+  startDate: string;
+  endDate: string;
+  message: string;
 };
 
 export type ScanResult = {

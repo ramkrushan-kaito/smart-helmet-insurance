@@ -9,7 +9,7 @@ import { ShellLayout } from '../layouts/ShellLayout';
 import { AdminLoginPage, OtpLoginPage } from '../pages/AuthPages';
 import { AdminDashboardPage, CustomerDashboardPage } from '../pages/DashboardPages';
 import { AccessDeniedPage, InvalidQrPage, LandingPage, NotFoundPage } from '../pages/PublicPages';
-import { CoverPage } from '../pages/CoverPage';
+import { CoverPage, CoverPaymentPage, CoverSuccessPage } from '../pages/CoverPage';
 import { ScanPage, ScanRedirect } from '../pages/ScanPage';
 import { ProtectedRoute } from './ProtectedRoute';
 import { useAuth } from '../hooks/useAuth';
@@ -55,6 +55,8 @@ export function AppRoutes() {
       <Route path="/scan" element={<ScanPage />} />
       <Route path="/scan/:token" element={<ScanRedirect />} />
       <Route path="/cover/:token" element={<CoverPage />} />
+      <Route path="/cover/:token/pay/:code" element={<CoverPaymentPage />} />
+      <Route path="/cover/:token/success" element={<CoverSuccessPage />} />
       <Route path="/invalid-qr" element={<InvalidQrPage />} />
       <Route path="/login" element={<OtpLoginPage />} />
       <Route path="/admin/login" element={<AdminLoginPage />} />
