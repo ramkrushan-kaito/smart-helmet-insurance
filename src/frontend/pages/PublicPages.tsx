@@ -50,12 +50,13 @@ export function InvalidQrPage() {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <PublicBar />
-      <Container sx={{ py: 8, maxWidth: 720 }}>
-        <Typography variant="h4">This QR cannot be used</Typography>
-        <Paper sx={{ p: 3, mt: 2 }} variant="outlined">
-          <Typography>{message || 'This helmet is not registered.'}</Typography>
+      <Container sx={{ py: { xs: 6, md: 10 }, maxWidth: 520, textAlign: 'center' }}>
+        <Paper sx={{ p: { xs: 3, md: 4 }, borderRadius: '20px', boxShadow: '0 1px 2px rgba(11,31,58,0.04), 0 8px 24px rgba(11,31,58,0.06)' }}>
+          <Box sx={{ width: 72, height: 72, mx: 'auto', mb: 2, borderRadius: '50%', bgcolor: '#FEE4E2', color: 'error.main', display: 'grid', placeItems: 'center', fontSize: 36, fontWeight: 800 }}>!</Box>
+          <Typography variant="h5">This QR cannot be used</Typography>
+          <Typography color="text.secondary" sx={{ mt: 1 }}>{message || 'This helmet is not registered.'}</Typography>
+          <Button component={RouterLink} to="/scan" variant="contained" size="large" fullWidth sx={{ mt: 3 }}>Scan again</Button>
         </Paper>
-        <Button component={RouterLink} to="/scan" variant="contained" sx={{ mt: 2 }}>Scan again</Button>
       </Container>
     </Box>
   );
