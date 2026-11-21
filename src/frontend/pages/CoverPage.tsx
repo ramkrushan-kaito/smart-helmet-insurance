@@ -24,11 +24,11 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import { FormEvent, ReactNode, useEffect, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { LoadingBlock, PublicBar } from '../components/ui';
 import { api, cleanName, day, errorMessage, money } from '../services/api';
 import { brand } from '../theme';
-import { ScanCompany, ScanPurchase, ScanResult } from '../types';
+import { BuyerDetails, ScanCompany, ScanPurchase, ScanResult } from '../types';
 
 const GST_RATE = 0.18;
 
@@ -40,7 +40,7 @@ const PLAN_COLORS: Record<string, string> = {
   SENTINEL: '#0B1F3A',
 };
 
-function useScan(token: string) {
+export function useScan(token: string) {
   const navigate = useNavigate();
   const [result, setResult] = useState<ScanResult | null>(null);
 
@@ -66,7 +66,11 @@ function useScan(token: string) {
   return result;
 }
 
-function Page({ children, hero }: { children: ReactNode; hero?: ReactNode }) {
+export function Page({ children, hero }: { children: ReactNode; hero?: ReactNode }) {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <PublicBar />
@@ -82,8 +86,8 @@ function Page({ children, hero }: { children: ReactNode; hero?: ReactNode }) {
   );
 }
 
-function Steps({ active, light }: { active: 0 | 1 | 2; light?: boolean }) {
-  const labels = ['Choose plan', 'Payment', 'Policy issued'];
+export function Steps({ active, light }: { active: 0 | 1 | 2 | 3; light?: boolean }) {
+  const labels = ['Choose plan', 'Your details', 'Payment', 'Policy issued'];
   const base = light ? 'rgba(255,255,255,' : 'rgba(11,31,58,';
   return (
     <Stack direction="row" alignItems="center" sx={{ mb: 3 }}>
@@ -161,12 +165,12 @@ function InfoPill({ icon, text }: { icon: ReactNode; text: string }) {
   );
 }
 
-function withGst(premium: number) {
+export function withGst(premium: number) {
   const gst = Math.round(premium * GST_RATE);
   return { gst, total: premium + gst };
 }
 
-function PlanLogo({ plan, size = 48 }: { plan: ScanCompany; size?: number }) {
+export function PlanLogo({ plan, size = 48 }: { plan: ScanCompany; size?: number }) {
   const color = PLAN_COLORS[plan.code] ?? brand.blue;
   return (
     <Box
@@ -296,7 +300,7 @@ export function CoverPage() {
                     variant="contained"
                     size="large"
                     sx={{ minWidth: 140 }}
-                    onClick={() => navigate(`/cover/${encodeURIComponent(token)}/pay/${plan.code}`, { state: { plan, result } })}
+                    onClick={() => navigate(`/cover/${encodeURIComponent(token)}/details/${plan.code}`, { state: { plan, result } })}
                   >
                     Buy now
                   </Button>
@@ -358,8 +362,9 @@ const METHODS: { id: Method; label: string; hint: string; icon: ReactNode }[] = 
 export function CoverPaymentPage() {
   const { token = '', code = '' } = useParams();
   const navigate = useNavigate();
-  const location = useLocation() as { state?: { plan?: ScanCompany; result?: ScanResult } };
-  const fetched = useScan(location.state?.result ? '' : token);
+  const location = useLocation() as { state?: { plan?: ScanCompany; result?: ScanResult; details?: BuyerDetails } };
+  const details = location.state?.details;
+  const fetched = useScan(location.state?.result || !details ? '' : token);
   const result = location.state?.result ?? fetched;
   const plan = location.state?.plan ?? result?.companies.find((item) => item.code === code) ?? null;
   const [method, setMethod] = useState<Method>('UPI');
@@ -369,6 +374,7 @@ export function CoverPaymentPage() {
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  if (!details) return <Navigate to={`/cover/${encodeURIComponent(token)}/details/${code}`} replace state={location.state} />;
   if (!result) return <Page><LoadingBlock /></Page>;
   if (!plan) {
     return (
@@ -383,7 +389,7 @@ export function CoverPaymentPage() {
 
   async function pay(event: FormEvent) {
     event.preventDefault();
-    if (!plan) return;
+    if (!plan || !details) return;
     setPaying(true);
     setError(null);
     try {
@@ -393,6 +399,8 @@ export function CoverPaymentPage() {
         token,
         companyCode: plan.code,
         paymentMethod: method,
+        holder: { ...details.holder, aadhaar: details.holder.aadhaar.replace(/\s+/g, '') },
+        nominees: details.nominees.map((nominee) => ({ ...nominee, age: Number(nominee.age), share: Number(nominee.share) })),
       });
       navigate(`/cover/${encodeURIComponent(token)}/success`, {
         replace: true,
@@ -408,14 +416,14 @@ export function CoverPaymentPage() {
     <Page
       hero={
         <>
-          <Steps active={1} light />
+          <Steps active={2} light />
           <Button
-            onClick={() => navigate(`/cover/${encodeURIComponent(token)}`)}
+            onClick={() => navigate(`/cover/${encodeURIComponent(token)}/details/${plan.code}`, { state: { plan, result, details } })}
             disabled={paying}
             startIcon={<ArrowBackIcon />}
             sx={{ color: 'rgba(255,255,255,0.85)', ml: -1, mb: 0.5 }}
           >
-            Change plan
+            Edit details
           </Button>
           <Typography variant="h4" sx={{ fontSize: { xs: 26, md: 34 } }}>Complete payment</Typography>
         </>
@@ -520,6 +528,8 @@ export function CoverPaymentPage() {
           </Box>
           <Box sx={{ p: { xs: 2, md: 2.5 } }}>
             <Row label="Helmet" value={result.helmet.helmetCode} />
+            <Row label="Policyholder" value={details.holder.fullName} />
+            <Row label="Nominee" value={details.nominees.map((nominee) => `${nominee.name} (${nominee.share}%)`).join(', ')} />
             <Row label="Cover amount" value={money(plan.coverage)} />
             <Row label="Policy term" value={`${plan.months} months`} />
             <Divider sx={{ my: 1.5, borderStyle: 'dashed' }} />
@@ -536,7 +546,7 @@ export function CoverPaymentPage() {
   );
 }
 
-function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+export function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <Stack direction="row" justifyContent="space-between" sx={{ py: 0.6 }} spacing={2}>
       <Typography variant="body2" color={strong ? 'text.primary' : 'text.secondary'} fontWeight={strong ? 700 : 500}>{label}</Typography>
@@ -570,7 +580,7 @@ export function CoverSuccessPage() {
     <Page
       hero={
         <>
-          <Steps active={2} light />
+          <Steps active={3} light />
           <Stack alignItems="center" sx={{ textAlign: 'center', pt: 1 }}>
             <Box sx={{ position: 'relative', width: 84, height: 84, mb: 2 }}>
               <Box sx={{ position: 'absolute', inset: 0, borderRadius: '50%', bgcolor: 'rgba(18,161,95,0.5)', animation: 'pulse-ring 1.6s ease-out infinite' }} />
@@ -607,6 +617,16 @@ export function CoverSuccessPage() {
           <Row label="Cover amount" value={money(purchase.coverageAmount)} />
           <Row label="Valid from" value={day(purchase.startDate)} />
           <Row label="Valid until" value={day(purchase.endDate)} />
+          {purchase.holder ? (
+            <>
+              <Divider sx={{ my: 1.5, borderStyle: 'dashed' }} />
+              <Row label="Policyholder" value={purchase.holder.fullName} />
+              <Row label="Aadhaar" value={purchase.holder.aadhaarMasked} />
+              {purchase.nominees.map((nominee) => (
+                <Row key={nominee.name} label={`Nominee · ${nominee.relationship}`} value={`${nominee.name} · ${nominee.share}%`} />
+              ))}
+            </>
+          ) : null}
           <Divider sx={{ my: 1.5, borderStyle: 'dashed' }} />
           <Row label="Payment ref" value={purchase.paymentRef} />
           <Row label="Paid via" value={METHOD_LABEL[method]} />

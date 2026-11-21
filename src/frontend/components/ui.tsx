@@ -22,28 +22,12 @@ export function PublicBar() {
     >
       <Stack direction="row" alignItems="center" sx={{ maxWidth: 1120, mx: 'auto', px: 2, height: 64, gap: 1 }}>
         <Stack component={RouterLink} to="/" direction="row" alignItems="center" spacing={1.2} sx={{ color: 'text.primary', textDecoration: 'none', flexGrow: 1 }}>
-          <Box
-            sx={{
-              width: 34,
-              height: 34,
-              borderRadius: '10px',
-              display: 'grid',
-              placeItems: 'center',
-              color: '#fff',
-              fontWeight: 800,
-              fontSize: 17,
-              background: 'linear-gradient(135deg, #2457F5 0%, #00B3C7 100%)',
-              boxShadow: '0 4px 12px rgba(36,87,245,0.35)',
-            }}
-          >
-            K
-          </Box>
+          <Box component="img" src="/kaitotech-logo.svg" alt="Kaito" sx={{ width: 34, height: 33, display: 'block' }} />
           <Typography sx={{ fontWeight: 800, fontSize: 18, letterSpacing: -0.3 }}>
             Kaito<Box component="span" sx={{ color: 'primary.main' }}> Nexus</Box>
           </Typography>
         </Stack>
         <Button component={RouterLink} to="/scan" color="inherit" sx={{ color: 'text.secondary' }}>Scan</Button>
-        <Button component={RouterLink} to="/login" variant="outlined" size="small" sx={{ borderRadius: 999 }}>Sign in</Button>
       </Stack>
     </Box>
   );

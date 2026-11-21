@@ -1,5 +1,5 @@
-import { Type } from 'class-transformer';
-import { IsBoolean, IsDateString, IsEnum, IsIn, IsNumber, IsOptional, IsString, IsUUID, MaxLength, Min, MinLength } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsEnum, IsIn, IsInt, IsNumber, Matches, Max, ValidateNested, IsOptional, IsString, IsUUID, MaxLength, Min, MinLength } from 'class-validator';
 import { QrStatus } from '@prisma/client';
 
 export class GenerateQrDto {
@@ -38,6 +38,54 @@ export class ScanClaimDto {
   claimAmount: number;
 }
 
+const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
+
+export const NOMINEE_RELATIONS = ['Spouse', 'Father', 'Mother', 'Son', 'Daughter', 'Brother', 'Sister', 'Other'] as const;
+
+export class PolicyHolderDto {
+  @Transform(trim)
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  fullName: string;
+
+  @IsDateString()
+  dob: string;
+
+  @Transform(trim)
+  @IsString()
+  @MinLength(10)
+  @MaxLength(500)
+  address: string;
+
+  @Transform(({ value }) => (typeof value === 'string' ? value.replace(/\s+/g, '') : value))
+  @Matches(/^[2-9][0-9]{11}$/, { message: 'Aadhaar number must be 12 digits.' })
+  aadhaar: string;
+}
+
+export class NomineeDto {
+  @Transform(trim)
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  name: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(120)
+  age: number;
+
+  @IsIn(NOMINEE_RELATIONS)
+  relationship: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  share: number;
+}
+
 export class ScanBuyDto {
   @IsString()
   @MinLength(1)
@@ -57,6 +105,19 @@ export class ScanBuyDto {
   @IsOptional()
   @IsIn(['UPI', 'CARD', 'NETBANKING'])
   paymentMethod?: 'UPI' | 'CARD' | 'NETBANKING';
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PolicyHolderDto)
+  holder?: PolicyHolderDto;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(4)
+  @ValidateNested({ each: true })
+  @Type(() => NomineeDto)
+  nominees?: NomineeDto[];
 }
 
 export class UpdateQrStatusDto {

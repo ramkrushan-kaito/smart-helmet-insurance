@@ -171,7 +171,13 @@ export type ScanCompany = {
   features: string[];
 };
 
+export type PolicyHolderForm = { fullName: string; dob: string; address: string; aadhaar: string };
+export type NomineeForm = { name: string; age: string; relationship: string; share: string };
+export type BuyerDetails = { holder: PolicyHolderForm; nominees: NomineeForm[] };
+
 export type ScanPurchase = {
+  holder: { fullName: string; dob: string; address: string; aadhaarMasked: string } | null;
+  nominees: { name: string; age: number; relationship: string; share: number }[];
   policyNumber: string;
   status: string;
   paymentRef: string;

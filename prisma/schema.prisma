@@ -287,6 +287,8 @@ model InsurancePolicy {
   premiumAmount  Decimal            @map("premium_amount") @db.Decimal(12, 2)
   coverageAmount Decimal            @map("coverage_amount") @db.Decimal(12, 2)
   isDemo         Boolean            @default(true) @map("is_demo")
+  holderDetails  Json?              @map("holder_details")
+  nominees       Json?
   deletedAt      DateTime?          @map("deleted_at")
   createdAt      DateTime           @default(now()) @map("created_at")
   updatedAt      DateTime           @updatedAt @map("updated_at")

@@ -323,6 +323,28 @@ export class QrCodesService {
         ? await this.prisma.insuranceProduct.findFirst({ where: { id: dto.productId, isActive: true } })
         : null;
     if (!product) throw new NotFoundException('Choose an insurer.');
+    if (dto.nominees?.length) {
+      const total = dto.nominees.reduce((sum, nominee) => sum + nominee.share, 0);
+      if (total !== 100) throw new BadRequestException('Nominee shares must add up to 100%.');
+    }
+    if (dto.holder) {
+      const dob = new Date(dto.holder.dob);
+      const adult = new Date();
+      adult.setFullYear(adult.getFullYear() - 18);
+      if (Number.isNaN(dob.getTime()) || dob > adult) {
+        throw new BadRequestException('Policyholder must be at least 18 years old.');
+      }
+    }
+    // Keep only the last four Aadhaar digits; the full number is never stored.
+    const holderDetails = dto.holder
+      ? {
+          fullName: dto.holder.fullName,
+          dob: dto.holder.dob.slice(0, 10),
+          address: dto.holder.address,
+          aadhaarMasked: `XXXX XXXX ${dto.holder.aadhaar.slice(-4)}`,
+        }
+      : undefined;
+    const nominees = dto.nominees?.map(({ name, age, relationship, share }) => ({ name, age, relationship, share }));
     const start = new Date();
     start.setUTCHours(0, 0, 0, 0);
     const end = new Date(start);
@@ -343,6 +365,8 @@ export class QrCodesService {
           premiumAmount: product.premiumAmount,
           coverageAmount: product.coverageAmount,
           isDemo: true,
+          holderDetails,
+          nominees,
         },
       });
       const paymentRef = await this.sequences.next('payment', 'PAY', tx);
@@ -382,6 +406,8 @@ export class QrCodesService {
       status: policy.status,
       paymentRef: reference,
       productName: product.name,
+      holder: holderDetails ?? null,
+      nominees: nominees ?? [],
       premiumAmount: product.premiumAmount.toString(),
       coverageAmount: product.coverageAmount.toString(),
       startDate: policy.startDate,
